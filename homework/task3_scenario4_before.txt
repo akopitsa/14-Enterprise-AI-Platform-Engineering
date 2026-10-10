@@ -1,0 +1,54 @@
+  Сценарій 4: ГОЛОВНА ДЕМОНСТРАЦІЯ: запит менеджера → агент → наскрізний trace   (слайд 46–47)
+══════════════════════════════════════════════════════════════════════════════
+  POST /v1/agents/retention-agent/invoke          → 200 ✅
+       агент для клієнта C1200: status=offer_sent, offer=12% знижка лояльності + пріоритетна підтримка
+
+  Пояснення: Ймовірність відтоку клієнта — 75%. Ключові чинники: багато звернень до підтримки; мала тривалість обслуговування; високий щомісячний рахунок. Рекомендація за політикою «Лояльність при частих зверненнях»: Клієнтам з частими зверненнями до підтримки пропонуйте пріоритетну підтримку та знижку на 3 місяці.
+  Ви спілкуєтеся з AI-асистентом
+  Trace (як на слайді 47):
+  {
+    "request_id": "req_c466a656",
+    "tenant_id": "telco-crm",
+    "steps": [
+      {
+        "tier": "ml",
+        "op": "predict",
+        "latency_ms": 0.1,
+        "result": "score=0.746"
+      },
+      {
+        "tier": "llm",
+        "op": "retrieve",
+        "latency_ms": 0.2,
+        "result": "3 docs"
+      },
+      {
+        "tier": "llm",
+        "op": "explain",
+        "latency_ms": 0.0,
+        "backend": "stub",
+        "faithfulness_proxy": 0.73
+      },
+      {
+        "tier": "agent",
+        "op": "draft_offer",
+        "latency_ms": 0.0,
+        "discount_pct": 12
+      },
+      {
+        "tier": "agent",
+        "op": "guardrail_check",
+        "latency_ms": 0.0,
+        "needs_approval": false,
+        "limit_pct": 15
+      },
+      {
+        "tier": "agent",
+        "op": "send_offer",
+        "result": "sent"
+      }
+    ],
+    "total_latency_ms": 0.5,
+    "total_cost_usd": 0.000748
+  }
+

@@ -1,0 +1,22 @@
+apiVersion: platform.softserve.ai/v1
+kind: ModelDeployment
+metadata:
+  name: churn-predictor-api
+  tenant: telco-crm
+  environment: production
+spec:
+  type: ml-service
+  baseImage: registry.internal/sklearn-serving:approved
+  model: churn-predictor
+  resources:
+    gpu: 0
+    replicas: { min: 2, max: 4 }                 # production: ≥ 2 репліки (HA)
+  costCeiling:
+    monthlyUSD: 300
+    alertAt: 0.9
+  compliance:
+    piiScan: required
+    dataResidency: eu-central-1
+  observability:
+    dashboards: [latency, drift]
+    auditSink: clickhouse://audit-cluster

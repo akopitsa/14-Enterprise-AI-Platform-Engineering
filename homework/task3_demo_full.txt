@@ -1,0 +1,166 @@
+Шлюз: http://127.0.0.1:8099   |   орендарі: telco-crm, telco-b2b, telco-trial
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 1: Автентифікація: без токена, підробка, прострочений токен   (слайд 42–43)
+══════════════════════════════════════════════════════════════════════════════
+  GET  /health                                    → 200 ✅
+       health публічний: {"status": "ok"}
+  GET  /v1/models                                 → 401 ✅
+       без токена: {"error": "unauthorized"}
+  GET  /v1/models                                 → 401 ✅
+       підписаний ЧУЖИМ ключем: {"error": "unauthorized"}
+  GET  /v1/models                                 → 401 ✅
+       прострочений: {"error": "unauthorized"}
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 2: RBAC: viewer не може викликати модель, operator — може   (слайд 7, 13)
+══════════════════════════════════════════════════════════════════════════════
+  POST /v1/models/churn-predictor/predict         → 403 ✅
+       viewer → predict: {"detail": "Role 'viewer' lacks scope 'models:invoke'"}
+  POST /v1/models/churn-predictor/predict         → 200 ✅
+       operator → predict: score=0.987, чинники: ['багато звернень до підтримки', 'падіння використання даних', 'високий щомісячний рахунок']
+  GET  /v1/billing/usage                          → 403 ✅
+       operator → billing (admin-only): {"detail": "Role 'operator' lacks scope 'billing:read'"}
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 3: Ізоляція орендарів: чужий клієнт = 404, а підроблений X-Tenant-Id ігнорується   (слайд 7, 42)
+══════════════════════════════════════════════════════════════════════════════
+  POST /v1/models/churn-predictor/predict         → 404 ✅
+       crm-токен просить клієнта b2b: {"detail": "not found"}
+  POST /v1/models/churn-predictor/predict         → 404 ✅
+       X-Tenant-Id: telco-b2b у заголовку: {"detail": "not found"}
+  POST /v1/models/churn-predictor/predict         → 200 ✅
+       свій клієнт зі спуфінгом заголовка: tenant береться з JWT → працює як crm
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 4: ГОЛОВНА ДЕМОНСТРАЦІЯ: запит менеджера → агент → наскрізний trace   (слайд 46–47)
+══════════════════════════════════════════════════════════════════════════════
+  POST /v1/agents/retention-agent/invoke          → 200 ✅
+       агент для клієнта C1200: status=pending_approval, offer=12% знижка лояльності + пріоритетна підтримка
+
+  Пояснення: Ймовірність відтоку клієнта — 75%. Ключові чинники: багато звернень до підтримки; мала тривалість обслуговування; високий щомісячний рахунок. Рекомендація за політикою «Лояльність при частих зверненнях»: Клієнтам з частими зверненнями до підтримки пропонуйте пріоритетну підтримку та знижку на 3 місяці.
+  Ви спілкуєтеся з AI-асистентом
+  Trace (як на слайді 47):
+  {
+    "request_id": "req_c93ada4c",
+    "tenant_id": "telco-crm",
+    "steps": [
+      {
+        "tier": "ml",
+        "op": "predict",
+        "latency_ms": 0.1,
+        "result": "score=0.746"
+      },
+      {
+        "tier": "llm",
+        "op": "retrieve",
+        "latency_ms": 0.2,
+        "result": "3 docs"
+      },
+      {
+        "tier": "llm",
+        "op": "explain",
+        "latency_ms": 0.0,
+        "backend": "stub",
+        "faithfulness_proxy": 0.73
+      },
+      {
+        "tier": "agent",
+        "op": "draft_offer",
+        "latency_ms": 0.0,
+        "discount_pct": 12
+      },
+      {
+        "tier": "agent",
+        "op": "guardrail_check",
+        "latency_ms": 0.0,
+        "needs_approval": true,
+        "limit_pct": 10
+      },
+      {
+        "tier": "agent",
+        "op": "human_approval",
+        "result": "pending",
+        "approval_id": "apr_327c63"
+      }
+    ],
+    "total_latency_ms": 0.5,
+    "total_cost_usd": 0.000748
+  }
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 5: Guardrail у коді: знижка 25% > 15% → потрібне схвалення людини   (слайд 37–38, 30)
+══════════════════════════════════════════════════════════════════════════════
+  POST /v1/agents/retention-agent/invoke          → 200 ✅
+       агент для high-risk C1224: status=pending_approval, offer=25% знижка лояльності + пріоритетна підтримка, approval=apr_e04978
+  POST /v1/approvals/apr_e04978/decide            → 403 ✅
+       operator намагається схвалити сам: {"detail": "Role 'operator' lacks scope 'approvals:decide'"}
+  GET  /v1/approvals                              → 200 ✅
+       admin бачить чергу схвалень: 2 в очікуванні
+  POST /v1/approvals/apr_e04978/decide            → 200 ✅
+       admin схвалює: approved_and_sent by carol@telco.com
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 6: Rate limit (token bucket) для telco-b2b: 6 запитів/хв   (слайд 15, 44)
+══════════════════════════════════════════════════════════════════════════════
+  Статуси 9 запитів поспіль: 200 200 200 200 200 200 429 429 429
+  інші орендарі не страждають — ліміт на орендаря:
+  GET  /v1/models                                 → 200 ✅
+       crm у цей же момент: ok
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 7: Облік витрат: бюджет telco-trial $0.0012 → alert на 90% → блок на 4-му запиті   (слайд 17, 44)
+══════════════════════════════════════════════════════════════════════════════
+  POST /v1/agents/retention-agent/invoke          → 200 ✅
+       агент #1: cost=$0.000506
+  POST /v1/agents/retention-agent/invoke          → 200 ✅
+       агент #2: cost=$0.000506
+  POST /v1/agents/retention-agent/invoke          → 200 ✅
+       агент #3: cost=$0.000506  ⚠️ budget_alert
+  POST /v1/agents/retention-agent/invoke          → 429 ✅
+       агент #4: БЛОК: budget_exceeded — витрачено $0.001518 з $0.0012
+
+══════════════════════════════════════════════════════════════════════════════
+  Сценарій 8: Комплаєнс: usage, «усі рішення щодо клієнта X», незмінність журналу   (слайд 26, 28–29)
+══════════════════════════════════════════════════════════════════════════════
+  GET  /v1/billing/usage                          → 200 ✅
+       admin: billing usage: spent=$0.001482 з $50.0 (0.0%)
+  GET  /v1/audit/customers/C1224                  → 200 ✅
+       admin: аудит щодо C1224: подій у журналі: 4
+       08:30:29 /v1/models/churn-predictor/predict 200 score=0.987
+       08:30:30 /v1/models/churn-predictor/predict 200 score=0.987
+       08:30:30 /v1/agents/retention-agent/invoke  200 pending_approval
+       08:30:30 /v1/approvals/apr_e04978/decide    200 approved_and_sent
+  GET  /v1/audit/customers/C1224                  → 403 ✅
+       operator: аудит (admin-only): {"detail": "Role 'operator' lacks scope 'audit:read'"}
+  ✅ спроба DELETE FROM audit_events → audit log is append-only
+
+Звіт з аудиту (заміна дашборда Grafana):
+
+── Запити, помилки, затримка та витрати по орендарях
+   tenant       requests  2xx  401/403  429  p95_ms  cost_usd
+   telco-b2b    9         6    0        3    5       0       
+   telco-crm    18        12   4        0    2       0.001482
+   telco-trial  5         4    0        1    2       0.001518
+   unknown      5         2    3        0    1       0       
+
+── Відмови та політики (401/403/429)
+   tenant       user             path                                status  decision                                        
+   telco-crm    bob@telco.com    /v1/audit/customers/C1224           403     denied: role 'operator' lacks 'audit:read'      
+   telco-trial  erin@trial.com   /v1/agents/retention-agent/invoke   429     budget_exceeded                                 
+   telco-b2b    dave@b2b.com     /v1/models                          429     rate_limited                                    
+   telco-b2b    dave@b2b.com     /v1/models                          429     rate_limited                                    
+   telco-b2b    dave@b2b.com     /v1/models                          429     rate_limited                                    
+   telco-crm    bob@telco.com    /v1/approvals/apr_e04978/decide     403     denied: role 'operator' lacks 'approvals:decide'
+   telco-crm    bob@telco.com    /v1/billing/usage                   403     denied: role 'operator' lacks 'billing:read'    
+   telco-crm    alice@telco.com  /v1/models/churn-predictor/predict  403     denied: role 'viewer' lacks 'models:invoke'     
+   unknown      anonymous        /v1/models                          401     401: ExpiredSignatureError                      
+   unknown      anonymous        /v1/models                          401     401: InvalidSignatureError                      
+   unknown      anonymous        /v1/models                          401     401: DecodeError                                
+
+── Алерти платформи
+   tenant       decision                     
+   telco-trial  budget_alert: 126% of $0.0012
+
+══════════════════════════════════════════════════════════════════════════════
+  Перевірок: 33   успішно: 33   невдало: 0

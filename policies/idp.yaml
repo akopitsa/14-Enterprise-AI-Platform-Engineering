@@ -5,3 +5,5 @@ approved_base_images:
 max_gpu_per_deployment: 4
 max_monthly_usd: 10000
 allowed_data_residency: [eu-west-1, eu-central-1]
+allowed_environments: [dev, staging, production]
+production_min_replicas: 2       # HA: production без однієї точки відмови

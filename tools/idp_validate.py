@@ -18,6 +18,12 @@ def validate(manifest, policy):
     rep = s.get("resources", {}).get("replicas", {})
     if rep.get("min", 0) < 1 or rep.get("max", 0) < rep.get("min", 0):
         v.append(f"replicas некоректні: {rep}")
+    env = manifest.get("metadata", {}).get("environment", "production")   # fail-safe: не вказано = production
+    if env not in policy["allowed_environments"]:
+        v.append(f"metadata.environment '{env}' має бути одним із {policy['allowed_environments']}")
+    elif env == "production" and rep.get("min", 0) < policy["production_min_replicas"]:
+        v.append(f"replicas.min={rep.get('min', 0)} < {policy['production_min_replicas']} для production "
+                 f"(одна репліка = простій під час оновлення чи збою вузла)")
     cc = s.get("costCeiling")
     if not cc:
         v.append("відсутній costCeiling (обов'язковий бюджет)")

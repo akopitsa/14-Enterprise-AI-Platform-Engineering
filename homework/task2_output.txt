@@ -1,0 +1,25 @@
+$ grep -A1 'auditor:' policies/rbac.yaml
+  auditor:                # комплаєнс: лише читання журналу аудиту (без моделей, агентів і білінгу)
+    - "audit:read"
+
+Токен ivan@telco.com / telco-crm / auditor видано; клієнт для перевірки: C1224
+
+── 1) auditor → GET /v1/audit/customers/C1224
+   curl http://127.0.0.1:8011/v1/audit/customers/C1224
+   HTTP 200  [OK]
+   {"customer_id":"C1224","events":[{"ts":"2026-10-10T08:30:22.862305+00:00","request_id":"req_a194bf5f","path":"/v1/models/churn-predictor/predict","status":200,"resource_name":"churn-predictor","decision":"score=0.987","cost_usd":0.0}]}
+
+── 2) auditor → POST /v1/models/churn-predictor/predict
+   curl -X POST http://127.0.0.1:8011/v1/models/churn-predictor/predict -H Content-Type: application/json -d {"customer_id": "C1224"}
+   HTTP 403  [OK]
+   {"detail":"Role 'auditor' lacks scope 'models:invoke'"}
+
+── 3) auditor → GET /v1/billing/usage
+   curl http://127.0.0.1:8011/v1/billing/usage
+   HTTP 403  [OK]
+   {"detail":"Role 'auditor' lacks scope 'billing:read'"}
+
+── Журнал аудиту фіксує і відмови auditor-а (decision з шлюзу):
+   ivan@telco.com | auditor | GET | /v1/audit/customers/C1224 | 200 | None
+   ivan@telco.com | auditor | POST | /v1/models/churn-predictor/predict | 403 | denied: role 'auditor' lacks 'models:invoke'
+   ivan@telco.com | auditor | GET | /v1/billing/usage | 403 | denied: role 'auditor' lacks 'billing:read'

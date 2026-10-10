@@ -10,7 +10,7 @@ POLICY_FILE = ROOT / "policies" / "rbac.yaml"
 JWT_ISSUER = "idp.telco.local"
 JWT_AUDIENCE = "ai-platform"
 
-MAX_AUTO_DISCOUNT = 15          # % — вище потрібне схвалення людини (guardrail)
+MAX_AUTO_DISCOUNT = 10          # % — вище потрібне схвалення людини (guardrail)
 PROMOTION_MIN_AUC = 0.75        # поріг просування моделі (CI gate)
 FAITHFULNESS_MIN = 0.7          # нижче — позначаємо відповідь для перевірки
 

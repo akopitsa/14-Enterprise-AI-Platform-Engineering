@@ -8,6 +8,8 @@ roles:
     - "models:invoke"
     - "agents:read"
     - "agents:invoke"
+  auditor:                # комплаєнс: лише читання журналу аудиту (без моделей, агентів і білінгу)
+    - "audit:read"
   admin:
     - "models:*"
     - "agents:*"

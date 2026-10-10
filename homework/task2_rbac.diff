@@ -1,0 +1,13 @@
+diff --git i/policies/rbac.yaml w/policies/rbac.yaml
+index ce71a80..e49cd3b 100644
+--- i/policies/rbac.yaml
++++ w/policies/rbac.yaml
+@@ -8,6 +8,8 @@ roles:
+     - "models:invoke"
+     - "agents:read"
+     - "agents:invoke"
++  auditor:                # комплаєнс: лише читання журналу аудиту (без моделей, агентів і білінгу)
++    - "audit:read"
+   admin:
+     - "models:*"
+     - "agents:*"

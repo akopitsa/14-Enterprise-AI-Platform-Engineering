@@ -1,0 +1,24 @@
+$ python tools/idp_validate.py idp_requests/good-prod-churn-api.yaml
+✅ good-prod-churn-api.yaml: політики пройдено — можна застосовувати через Terraform + Helm
+(код виходу: 0)
+
+$ python tools/idp_validate.py idp_requests/bad-prod-single-replica.yaml
+❌ bad-prod-single-replica.yaml: 1 порушень політики
+   • replicas.min=1 < 2 для production (одна репліка = простій під час оновлення чи збою вузла)
+(код виходу: 1)
+
+$ python tools/idp_validate.py idp_requests/good-retention-agent.yaml
+✅ good-retention-agent.yaml: політики пройдено — можна застосовувати через Terraform + Helm
+(код виходу: 0)
+
+$ python tools/idp_validate.py idp_requests/bad-shadow-llm.yaml
+❌ bad-shadow-llm.yaml: 7 порушень політики
+   • baseImage 'docker.io/someone/vllm:latest' не з переліку схвалених образів
+   • gpu=16 перевищує ліміт 4
+   • replicas некоректні: {'min': 4, 'max': 2}
+   • відсутній costCeiling (обов'язковий бюджет)
+   • compliance.piiScan має бути 'required'
+   • dataResidency 'us-east-1' не дозволений
+   • відсутній observability.auditSink (аудит за замовчуванням)
+(код виходу: 1)
+

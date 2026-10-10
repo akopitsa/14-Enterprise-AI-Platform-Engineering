@@ -1,0 +1,83 @@
+diff --git i/idp_requests/bad-prod-single-replica.yaml w/idp_requests/bad-prod-single-replica.yaml
+new file mode 100644
+index 0000000..b1d186b
+--- /dev/null
++++ w/idp_requests/bad-prod-single-replica.yaml
+@@ -0,0 +1,22 @@
++apiVersion: platform.softserve.ai/v1
++kind: ModelDeployment
++metadata:
++  name: churn-predictor-api-cheap
++  tenant: telco-crm
++  environment: production
++spec:
++  type: ml-service
++  baseImage: registry.internal/sklearn-serving:approved
++  model: churn-predictor
++  resources:
++    gpu: 0
++    replicas: { min: 1, max: 4 }                 # ❌ одна репліка в production — нове правило
++  costCeiling:
++    monthlyUSD: 300
++    alertAt: 0.9
++  compliance:
++    piiScan: required
++    dataResidency: eu-central-1
++  observability:
++    dashboards: [latency, drift]
++    auditSink: clickhouse://audit-cluster
+diff --git i/idp_requests/good-prod-churn-api.yaml w/idp_requests/good-prod-churn-api.yaml
+new file mode 100644
+index 0000000..f3f37cf
+--- /dev/null
++++ w/idp_requests/good-prod-churn-api.yaml
+@@ -0,0 +1,22 @@
++apiVersion: platform.softserve.ai/v1
++kind: ModelDeployment
++metadata:
++  name: churn-predictor-api
++  tenant: telco-crm
++  environment: production
++spec:
++  type: ml-service
++  baseImage: registry.internal/sklearn-serving:approved
++  model: churn-predictor
++  resources:
++    gpu: 0
++    replicas: { min: 2, max: 4 }                 # production: ≥ 2 репліки (HA)
++  costCeiling:
++    monthlyUSD: 300
++    alertAt: 0.9
++  compliance:
++    piiScan: required
++    dataResidency: eu-central-1
++  observability:
++    dashboards: [latency, drift]
++    auditSink: clickhouse://audit-cluster
+diff --git i/policies/idp.yaml w/policies/idp.yaml
+index 19c6212..7f14c00 100644
+--- i/policies/idp.yaml
++++ w/policies/idp.yaml
+@@ -5,3 +5,5 @@ approved_base_images:
+ max_gpu_per_deployment: 4
+ max_monthly_usd: 10000
+ allowed_data_residency: [eu-west-1, eu-central-1]
++allowed_environments: [dev, staging, production]
++production_min_replicas: 2       # HA: production без однієї точки відмови
+diff --git i/tools/idp_validate.py w/tools/idp_validate.py
+index 9abd04e..6d9fa9c 100644
+--- i/tools/idp_validate.py
++++ w/tools/idp_validate.py
+@@ -18,6 +18,12 @@ def validate(manifest, policy):
+     rep = s.get("resources", {}).get("replicas", {})
+     if rep.get("min", 0) < 1 or rep.get("max", 0) < rep.get("min", 0):
+         v.append(f"replicas некоректні: {rep}")
++    env = manifest.get("metadata", {}).get("environment", "production")   # fail-safe: не вказано = production
++    if env not in policy["allowed_environments"]:
++        v.append(f"metadata.environment '{env}' має бути одним із {policy['allowed_environments']}")
++    elif env == "production" and rep.get("min", 0) < policy["production_min_replicas"]:
++        v.append(f"replicas.min={rep.get('min', 0)} < {policy['production_min_replicas']} для production "
++                 f"(одна репліка = простій під час оновлення чи збою вузла)")
+     cc = s.get("costCeiling")
+     if not cc:
+         v.append("відсутній costCeiling (обов'язковий бюджет)")
