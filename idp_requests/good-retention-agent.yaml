@@ -1,0 +1,21 @@
+apiVersion: platform.softserve.ai/v1
+kind: ModelDeployment
+metadata:
+  name: retention-agent-explainer
+  tenant: telco-crm
+spec:
+  type: llm-service
+  baseImage: registry.internal/vllm:approved
+  model: mistral-7b-instruct-quantized
+  resources:
+    gpu: 1
+    replicas: { min: 2, max: 6 }
+  costCeiling:
+    monthlyUSD: 4000
+    alertAt: 0.8
+  compliance:
+    piiScan: required
+    dataResidency: eu-west-1
+  observability:
+    dashboards: [latency, cost, drift]
+    auditSink: clickhouse://audit-cluster

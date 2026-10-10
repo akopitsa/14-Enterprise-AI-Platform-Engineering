@@ -1,0 +1,7 @@
+# Запобіжники IDP (слайд 16): самообслуговування, але з автоматичними перевірками політик.
+approved_base_images:
+  - registry.internal/vllm:approved
+  - registry.internal/sklearn-serving:approved
+max_gpu_per_deployment: 4
+max_monthly_usd: 10000
+allowed_data_residency: [eu-west-1, eu-central-1]

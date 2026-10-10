@@ -1,0 +1,16 @@
+# Policy as code (слайд 7): правила RBAC живуть у Git і проходять PR-рев'ю.
+roles:
+  viewer:
+    - "models:read"
+    - "agents:read"
+  operator:
+    - "models:read"
+    - "models:invoke"
+    - "agents:read"
+    - "agents:invoke"
+  admin:
+    - "models:*"
+    - "agents:*"
+    - "billing:read"
+    - "audit:read"
+    - "approvals:decide"

@@ -1,0 +1,16 @@
+apiVersion: platform.softserve.ai/v1
+kind: ModelDeployment
+metadata:
+  name: shadow-llm
+  tenant: telco-b2b
+spec:
+  type: llm-service
+  baseImage: docker.io/someone/vllm:latest      # не з внутрішнього реєстру
+  model: big-model-70b
+  resources:
+    gpu: 16                                      # перевищує ліміт
+    replicas: { min: 4, max: 2 }                 # min > max
+  compliance:
+    piiScan: optional                            # має бути required
+    dataResidency: us-east-1                     # поза дозволеними регіонами
+  # costCeiling відсутній, auditSink відсутній
